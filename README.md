@@ -56,45 +56,45 @@ python -m http.server 8777
 
 ---
 
-## 3. 프록시 배포 (Cloudflare Workers)
+## 3. 배포 (Vercel)
 
-GitHub Pages 는 정적 파일만 올라가므로 프록시는 따로 배포해야 합니다.
-무료 한도로 충분합니다.
+화면과 API 를 **같은 도메인**에서 서빙하므로 CORS 설정이 필요 없습니다.
+`config.js` 도 손댈 필요가 없습니다 — 같은 도메인이면 상대 경로로 자동 동작합니다.
 
-```bash
-cd proxy
-npx wrangler deploy
-npx wrangler secret put KAKAO_REST_KEY      # 여기에 REST 키를 붙여 넣습니다
+1. [vercel.com](https://vercel.com) 에 GitHub 계정으로 로그인합니다.
+2. **Add New… > Project** 에서 이 저장소를 고르고 **Import** 합니다.
+3. 빌드 설정은 건드리지 않습니다. (`vercel.json` 에 이미 정적 + 함수로 지정돼 있습니다)
+4. **Environment Variables** 에 REST 키를 넣습니다. 이름과 값만 넣으면 됩니다.
+
+   | Name | Value |
+   |---|---|
+   | `KAKAO_REST_KEY` | 발급받은 REST API 키 |
+
+5. **Deploy** 를 누릅니다. 끝나면 `https://<프로젝트>.vercel.app` 주소가 나옵니다.
+6. 카카오 개발자 콘솔 **플랫폼 > Web** 에 그 주소를 등록합니다.
+   등록하지 않으면 지도가 401 로 뜨지 않습니다.
+
+이후 `main` 에 푸시할 때마다 자동으로 다시 배포됩니다.
+
+### 배포 확인
+
+```
+https://<프로젝트>.vercel.app/            화면이 뜨고 우측 상단이 "서버 연결됨"
 ```
 
-`wrangler.toml` 의 `ALLOW_ORIGIN` 을 본인 Pages 주소로 바꿉니다.
+"키 미설정" 이 뜨면 4번 환경변수가 반영되지 않은 것입니다.
+환경변수를 추가한 뒤에는 **재배포**해야 적용됩니다
+(Deployments > 맨 위 항목 > ⋯ > Redeploy).
 
-```toml
-[vars]
-ALLOW_ORIGIN = "https://<깃허브아이디>.github.io"
-```
+### 다른 도메인에서 부를 경우
 
-배포되면 `https://bus-route-proxy.<계정>.workers.dev` 주소가 나옵니다.
+화면을 GitHub Pages 등 다른 곳에 두고 API 만 Vercel 을 쓰려면:
 
----
+- `config.js` 의 `PROXY_URL` 에 `https://<프로젝트>.vercel.app` 을 적고
+- Vercel 환경변수 `ALLOW_ORIGIN` 에 화면 주소(`https://<아이디>.github.io`)를 넣습니다.
 
-## 4. GitHub Pages 배포
-
-`config.js` 를 채웁니다.
-
-```js
-window.APP_CONFIG = {
-  PROXY_URL: 'https://bus-route-proxy.<계정>.workers.dev',
-  KAKAO_JS_KEY: '발급받은_JavaScript_키'
-};
-```
-
-저장소에 올리고 **Settings > Pages** 에서 배포 브랜치를 지정하면 끝입니다.
-`proxy/` 폴더가 함께 올라가도 정적 페이지 동작에는 영향이 없습니다.
-
-> 무료 플랜의 GitHub Pages 는 공개 저장소를 씁니다.
-> **실제 원생 주소가 담긴 파일은 커밋하지 마세요.** 주소는 브라우저에서 입력받아
-> 저장도 그 기기의 localStorage 에만 됩니다.
+Cloudflare Workers 로 올리고 싶다면 `proxy/worker.js` 와 `proxy/wrangler.toml` 이
+그대로 쓸 수 있게 남아 있습니다 (`npx wrangler deploy`).
 
 ---
 

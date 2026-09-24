@@ -1,0 +1,11 @@
+{
+  "name": "bus-route-planner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "통학버스 동선 계산기 — 카카오모빌리티 도로망 기준 방문 순서 최적화",
+  "scripts": {
+    "dev": "node proxy/server.mjs",
+    "selftest": "node proxy/server.mjs --selftest"
+  }
+}
