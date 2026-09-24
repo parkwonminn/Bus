@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>통학버스 동선 계산기 — 큰 길 우선 경로 최적화</title>
+<meta name="description" content="유치원·학원 통학버스 동선을 큰 길 위주로 계산합니다. 카카오모빌리티 실제 도로 데이터로 방문 순서를 정하고 골목 주행 비율을 보여줍니다.">
+<meta name="robots" content="index, follow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="통학버스 동선 계산기">
+<meta property="og:description" content="좁은 골목을 피해 큰 길 위주로 통학버스 동선을 계산합니다.">
+<meta property="og:locale" content="ko_KR">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<style>
+:root{
+  --primary:#2f6bff; --accent:#12b5b0; --ink:#16202f; --muted:#6b7686;
+  --line:rgba(16,29,48,.10); --card:rgba(255,255,255,.78);
+  --page:#eef4ff; --page2:#f2fbfa; --radius:16px; --shadow:0 6px 24px rgba(20,40,80,.09);
+  --ok:#17a34a; --warn:#e5484d; --alley:#f08a24; --bus:#f59f0a;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI','Malgun Gothic',sans-serif;
+  color:var(--ink);line-height:1.6;min-height:100vh;
+  background:linear-gradient(140deg,var(--page) 0%,var(--page2) 100%);background-attachment:fixed;
+}
+a{color:inherit;text-decoration:none}
+button,input,textarea,select{font:inherit;color:inherit}
+code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.92em;background:#eaf0fb;padding:1px 5px;border-radius:5px}
+.wrap{max-width:1020px;margin:0 auto;padding:0 16px}
+.card{background:var(--card);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+
+header{position:fixed;inset:0 0 auto 0;height:60px;z-index:900;
+  background:rgba(255,255,255,.8);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+  padding-top:env(safe-area-inset-top,0px)}
+.hbar{max-width:1020px;margin:0 auto;padding:0 16px;height:60px;display:flex;align-items:center;justify-content:space-between}
+.logo{display:flex;align-items:center;gap:10px}
+.mark{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;
+  background:linear-gradient(135deg,var(--primary),var(--accent))}
+.brand{font-weight:800;font-size:19px;letter-spacing:-.02em;
+  background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.conn{font-size:12px;padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--muted)}
+.conn.ok{color:var(--ok);border-color:#9be0b6}
+.conn.bad{color:var(--warn);border-color:#f3b6b8}
+
+.hero{position:relative;overflow:hidden;padding:96px 0 26px;text-align:center}
+.blob{position:absolute;border-radius:50%;filter:blur(64px);opacity:.42;z-index:0;pointer-events:none}
+.blob.a{width:260px;height:260px;background:var(--primary);left:-90px;bottom:-70px}
+.blob.b{width:300px;height:300px;background:var(--accent);right:-110px;top:40px}
+.hero .wrap{position:relative;z-index:1}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:13px;color:var(--muted);
+  background:rgba(255,255,255,.82);border:1px solid var(--line);border-radius:999px;padding:7px 14px;margin-bottom:14px}
+h1{font-size:38px;line-height:1.2;font-weight:800;letter-spacing:-.03em;margin-bottom:12px}
+h1 .g{background:linear-gradient(135deg,var(--primary),var(--accent));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{font-size:16px;color:var(--muted)}
+
+main{padding-bottom:36px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.panel{padding:20px}
+.label{display:block;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:8px}
+.modes{display:grid;gap:8px;margin-bottom:16px}
+.mode{display:flex;gap:11px;align-items:flex-start;padding:11px 13px;background:#fff;
+  border:1px solid var(--line);border-radius:12px;cursor:pointer;transition:.15s}
+.mode:hover{border-color:#b9cdfb}
+.mode input{margin-top:4px;accent-color:var(--primary);width:16px;height:16px;flex:none}
+.mode.on{border-color:var(--primary);background:#f4f8ff;box-shadow:0 0 0 3px rgba(47,107,255,.10)}
+.mode b{display:block;font-size:14px;font-weight:600}
+.mode i{display:block;font-style:normal;font-size:12px;color:var(--muted)}
+
+.bus{border:1px solid #f6d79a;background:#fffaf0;border-radius:12px;padding:12px 13px;margin-bottom:16px}
+.bus > label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.bus input[type=checkbox]{margin-top:3px;accent-color:var(--bus);width:17px;height:17px;flex:none}
+.bus b{display:block;font-size:14px}
+.bus i{display:block;font-style:normal;font-size:12px;color:#9a6b12}
+.busopt{margin-top:11px;padding-top:11px;border-top:1px dashed #f0d197;display:grid;gap:9px}
+.busopt.off{display:none}
+.opt{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:#6b5320;cursor:pointer}
+.opt input{accent-color:var(--bus);margin-top:3px;flex:none}
+.rng{display:flex;align-items:center;gap:9px;font-size:12.5px;color:#6b5320}
+.rng input[type=range]{flex:1;accent-color:var(--bus)}
+.rng b{font-weight:700;min-width:56px;text-align:right}
+
+.rowhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:8px;flex-wrap:wrap}
+.chip{font-size:12px;padding:5px 11px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--muted);cursor:pointer;transition:.15s}
+.chip:hover{border-color:var(--primary);color:var(--primary)}
+.chip.green{border-color:#9be0b6;color:var(--ok)}
+.chip.on{background:var(--ok);border-color:var(--ok);color:#fff}
+textarea{width:100%;min-height:170px;padding:13px 14px;border:1px solid var(--line);border-radius:12px;
+  background:#fff;resize:vertical;font-size:15px;outline:none;line-height:1.7}
+textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(47,107,255,.12)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px}
+.btn{width:100%;border:0;border-radius:999px;padding:13px;font-weight:700;font-size:15px;color:#fff;cursor:pointer;
+  background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 6px 18px rgba(47,107,255,.28);transition:.15s}
+.btn:hover{filter:brightness(1.05)}
+.btn:disabled{opacity:.6;cursor:progress}
+.btn2row{display:flex;gap:8px;margin-top:10px}
+.btn2{flex:1;padding:10px;border-radius:999px;font-size:13px;font-weight:600;background:#fff;
+  border:1px solid var(--line);color:var(--muted);cursor:pointer;transition:.15s}
+.btn2:hover{border-color:var(--primary);color:var(--primary)}
+.status{margin-top:12px;font-size:13px;text-align:center;color:var(--muted);min-height:20px;white-space:pre-line}
+.status.err{color:var(--warn)}
+.status.ok{color:var(--ok)}
+
+#map{width:100%;height:430px;border-radius:var(--radius);overflow:hidden;
+  background:#e8eef6;border:1px solid var(--line);box-shadow:var(--shadow);display:grid;place-items:center;text-align:center;padding:20px}
+.maptop{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;flex-wrap:wrap}
+.legend{display:flex;gap:11px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);margin-top:8px}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.legend em{width:16px;height:4px;border-radius:2px;display:inline-block;font-style:normal}
+.pin{width:26px;height:26px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;
+  display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);transform:translate(-50%,-50%)}
+.pin.s{background:var(--ok)} .pin.e{background:var(--warn)}
+
+.sec{margin-top:16px;padding:18px}
+.sechead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px}
+.sechead h3{font-size:15px;color:var(--primary)}
+.sechead .note{font-size:12px;color:var(--muted)}
+.item{display:flex;align-items:center;gap:11px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:12px;background:#fff;margin-bottom:7px;cursor:grab;user-select:none;transition:border-color .15s,opacity .15s}
+.item:active{cursor:grabbing}
+.item.dragging{opacity:.45}
+.item.over{border-top:3px solid var(--primary)}
+.no{flex:none;width:27px;height:27px;border-radius:50%;display:grid;place-items:center;
+  font-size:12px;font-weight:700;color:#fff;background:var(--primary)}
+.no.s{background:var(--ok)} .no.e{background:var(--warn)}
+.itxt{flex:1;min-width:0}
+.itxt b{display:block;font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.itxt i{font-style:normal;font-size:12px;color:var(--muted);display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag{display:inline-block;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:999px;vertical-align:1px}
+.tag.alley{background:#fdeee0;color:#b45309;border:1px solid #f4c98e}
+.tag.big{background:#eaf6ee;color:#15803d;border:1px solid #b6e3c5}
+.tag.moved{background:#fff3e0;color:#b4700f;border:1px solid #f6d79a}
+.fix{flex:none;border:1px solid #f4c98e;background:#fffaf0;color:#b45309;font-size:11px;font-weight:600;
+  padding:5px 9px;border-radius:999px;cursor:pointer}
+.fix:hover{background:#fdeee0}
+.go{flex:none;border:1px solid var(--line);background:#fff;color:var(--muted);font-size:11px;
+  padding:5px 9px;border-radius:999px;cursor:pointer}
+.go:hover{border-color:var(--primary);color:var(--primary)}
+.total{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);text-align:center;font-weight:700;color:var(--primary)}
+.total i{display:block;font-style:normal;font-weight:500;font-size:12px;color:var(--muted);margin-top:3px}
+.gauge{margin-top:10px}
+.gauge .bar{height:9px;border-radius:999px;background:var(--alley);overflow:hidden}
+.gauge .bar > span{display:block;height:100%;background:var(--primary);border-radius:999px}
+.gauge .cap{display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted);margin-top:5px}
+.kbtn{width:100%;margin-top:12px;border:0;border-radius:999px;padding:13px;font-weight:700;font-size:15px;
+  background:#FEE500;color:#181600;cursor:pointer}
+.kbtn:hover{filter:brightness(.96)}
+.mini{font-size:13px;color:var(--muted)}
+.rowitem{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px}
+.rowitem:hover{background:#f3f6fb}
+.rowitem > div{min-width:0;cursor:pointer;flex:1}
+.rowitem b{display:block;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rowitem i{font-style:normal;font-size:11px;color:var(--muted)}
+.del{border:0;background:none;color:var(--warn);font-size:12px;cursor:pointer;padding:4px 7px;border-radius:7px;flex:none}
+.del:hover{background:#fef2f2}
+.stack{max-height:212px;overflow:auto}
+
+.how{margin-top:20px;padding:22px}
+.how h2,.faq h2{font-size:17px;color:var(--primary);margin-bottom:14px}
+.steps{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.step{display:flex;gap:11px}
+.step .n{flex:none;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  color:#fff;font-size:13px;font-weight:700;background:var(--primary)}
+.step:nth-child(2) .n{background:#5b8cff}
+.step:nth-child(3) .n{background:#25a7c9}
+.step:nth-child(4) .n{background:var(--accent)}
+.step b{display:block;font-size:14px}
+.step p{font-size:12.5px;color:var(--muted)}
+
+.faq{margin-top:20px;padding:22px}
+details{border-top:1px solid var(--line);padding:11px 2px}
+details:first-of-type{border-top:0}
+summary{cursor:pointer;font-size:14px;font-weight:600;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::before{content:'＋';color:var(--primary);font-weight:700;margin-right:8px}
+details[open] summary::before{content:'－'}
+details p{font-size:13px;color:var(--muted);padding:8px 0 2px 22px}
+
+.setup{margin-top:20px;padding:18px;border-color:#f3b6b8;background:#fff5f5}
+.setup h2{font-size:15px;color:var(--warn);margin-bottom:8px}
+.setup p,.setup li{font-size:12.5px;color:#7a3b3d}
+.setup ol{padding-left:20px;margin-top:6px}
+
+footer{margin:26px 0 calc(26px + env(safe-area-inset-bottom,0px));padding:18px 20px}
+.fin{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+
+.tabs{display:none;gap:6px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px;margin-bottom:14px}
+.tab{flex:1;text-align:center;font-size:13.5px;font-weight:600;padding:9px 0;border-radius:999px;cursor:pointer;color:var(--muted)}
+.tab.on{background:var(--primary);color:#fff}
+
+@media (max-width:820px){
+  h1{font-size:30px}
+  .hero{padding-top:88px}
+  .grid{grid-template-columns:1fr;gap:14px}
+  .tabs{display:flex}
+  .steps{grid-template-columns:1fr}
+  #map{height:350px}
+  body[data-tab="input"]  #pane-map,
+  body[data-tab="map"]    #pane-input,
+  body[data-tab="result"] #pane-input,
+  body[data-tab="map"]    #pane-result,
+  body[data-tab="result"] .maptop,
+  body[data-tab="result"] #map,
+  body[data-tab="result"] .legend,
+  body[data-tab="result"] #histSec{display:none}
+}
+</style>
+</head>
+<body data-tab="input">
+
+<header>
+  <div class="hbar">
+    <a href="./" class="logo">
+      <span class="mark">
+        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="18" r="2.6"/><circle cx="18" cy="6" r="2.6"/>
+          <path d="M8.5 16.2C11 13 9 10.6 12 9.3c2-.9 3-1.5 3.4-2.3"/>
+        </svg>
+      </span>
+      <span class="brand">통학버스 동선</span>
+    </a>
+    <span class="conn" id="conn">서버 확인 중…</span>
+  </div>
+</header>
+
+<section class="hero">
+  <span class="blob a"></span><span class="blob b"></span>
+  <div class="wrap">
+    <span class="pill">🚌 유치원 · 학원 통학차량 동선</span>
+    <h1>골목을 피해<br><span class="g">큰 길 위주</span>로 도는 순서</h1>
+    <p class="sub">카카오모빌리티 실제 도로 데이터로 방문 순서를 계산합니다.<br>골목에 걸린 정류장은 큰 길 쪽으로 옮기도록 알려 드립니다.</p>
+  </div>
+</section>
+
+<main class="wrap">
+  <div class="card setup" id="setup" hidden>
+    <h2>설정이 필요합니다</h2>
+    <p id="setupMsg"></p>
+    <ol>
+      <li><a href="https://developers.kakao.com" target="_blank" rel="noopener"><b>카카오 개발자 콘솔</b></a>에서 애플리케이션을 만들고 <b>REST API 키</b>와 <b>JavaScript 키</b>를 받습니다.</li>
+      <li>카카오모빌리티 <b>길찾기 API 사용 신청</b>을 하고 승인을 받습니다.</li>
+      <li><code>proxy/</code> 를 띄웁니다. 로컬은 <code>node proxy/server.mjs</code>, 배포는 Cloudflare Workers.</li>
+      <li><code>config.js</code> 의 <code>PROXY_URL</code> 과 <code>KAKAO_JS_KEY</code> 를 채웁니다.</li>
+    </ol>
+    <p style="margin-top:8px">자세한 절차는 저장소의 <code>README.md</code> 를 보세요.</p>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <div class="tab on" data-pane="input">📝 입력</div>
+    <div class="tab" data-pane="map">🗺️ 지도</div>
+    <div class="tab" data-pane="result">📋 결과</div>
+  </div>
+
+  <div class="grid">
+    <section class="card panel pane" id="pane-input">
+
+      <div class="bus">
+        <label>
+          <input type="checkbox" id="busOn" checked>
+          <span><b>통학버스 모드 — 큰 길 우선</b>
+          <i>소요시간 기준으로 순서를 정하고, 골목에 걸린 정류장을 찾아 큰 길로 옮기도록 제안합니다.</i></span>
+        </label>
+        <div class="busopt" id="busOpt">
+          <label class="opt"><input type="checkbox" id="optSuggest" checked>
+            <span>이면도로에 선 정류장을 찾아 큰 길 이동을 제안</span></label>
+          <div class="rng">
+            <span>이동 허용 거리</span>
+            <input type="range" id="optRadius" min="80" max="400" step="20" value="220">
+            <b id="radiusVal">220 m</b>
+          </div>
+          <label class="opt"><input type="checkbox" id="optUturn" checked>
+            <span>U턴 회피 — 버스가 좁은 길에서 돌아 나오는 경로를 줄입니다</span></label>
+          <label class="opt"><input type="checkbox" id="optMotorway" checked>
+            <span>고속도로 · 자동차전용도로 제외 — 통학 구간에는 불필요합니다</span></label>
+        </div>
+      </div>
+
+      <span class="label">경로 방식</span>
+      <div class="modes" id="modes">
+        <label class="mode">
+          <input type="radio" name="mode" value="loop">
+          <span><b>순환 경로</b><i>모두 돌고 출발지로 복귀</i></span>
+        </label>
+        <label class="mode">
+          <input type="radio" name="mode" value="linear">
+          <span><b>편도 경로</b><i>최적 순서로 이동, 복귀 없음</i></span>
+        </label>
+        <label class="mode on">
+          <input type="radio" name="mode" value="fixed" checked>
+          <span><b>출발 · 도착 고정 <span class="tag moved">통학 권장</span></b><i>첫 줄 차고지, 마지막 줄 유치원, 중간 정류장만 정렬</i></span>
+        </label>
+      </div>
+
+      <div class="rowhead">
+        <span class="label" style="margin:0">정차 지점 (줄바꿈으로 구분)</span>
+        <span style="display:flex;gap:6px">
+          <button class="chip green" type="button" id="geoBtn">📍 현재 위치</button>
+          <button class="chip" type="button" id="sampleBtn">예제 노선</button>
+        </span>
+      </div>
+      <textarea id="addr" spellcheck="false" placeholder="차고지 주소&#10;원생 집 주소 1&#10;원생 집 주소 2&#10;…&#10;유치원 주소"></textarea>
+      <p class="hint">최소 2개, 최대 20개. <code>이름 @ 위도,경도</code> 형식도 인식합니다.</p>
+
+      <button class="btn" id="calcBtn" type="button" style="margin-top:14px">최적 노선 계산하기</button>
+
+      <div class="btn2row">
+        <button class="btn2" type="button" id="saveBtn">💾 노선 저장</button>
+        <button class="btn2" type="button" id="listBtn">📂 저장 목록 <span id="savedCount">(0)</span></button>
+      </div>
+      <div class="stack" id="savedPanel" hidden
+           style="margin-top:10px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:12px"></div>
+
+      <p class="status" id="status"></p>
+    </section>
+
+    <div class="pane" id="pane-map">
+      <div class="maptop">
+        <button class="chip" type="button" id="clickBtn">🖱️ 지도 클릭으로 추가</button>
+        <span class="mini" id="mapNote">계산하면 실제 도로 경로가 그려집니다</span>
+      </div>
+      <div id="map"><p class="mini">지도를 표시하려면 <code>config.js</code> 에 카카오 JavaScript 키가 필요합니다.</p></div>
+      <div class="legend">
+        <span><em style="background:#2f6bff"></em> 큰 길 주행</span>
+        <span><em style="background:#f08a24"></em> 이면도로 · 골목</span>
+      </div>
+
+      <section class="card sec pane" id="pane-result" hidden>
+        <div class="sechead">
+          <h3>정차 순서</h3>
+          <span class="note">드래그해서 순서 변경</span>
+        </div>
+        <div id="list"></div>
+        <div class="total" id="total"></div>
+        <div class="gauge" id="gauge" hidden>
+          <div class="bar"><span id="gaugeFill"></span></div>
+          <div class="cap"><span id="gaugeBig"></span><span id="gaugeAlley"></span></div>
+        </div>
+        <button class="kbtn" type="button" id="kakaoBtn">🚗 카카오맵으로 첫 구간 길찾기</button>
+        <button class="btn2" type="button" id="copyBtn" style="margin-top:8px">📋 노선표 복사하기</button>
+      </section>
+
+      <section class="card sec" id="histSec">
+        <div class="sechead">
+          <h3 style="color:var(--muted);font-size:13.5px">최근 계산 기록</h3>
+          <button class="del" type="button" id="clearHist">전체 삭제</button>
+        </div>
+        <div id="hist" class="mini stack">기록이 없습니다.</div>
+      </section>
+    </div>
+  </div>
+
+  <section class="card how">
+    <h2>큰 길 우선은 이렇게 동작합니다</h2>
+    <div class="steps">
+      <div class="step"><span class="n">1</span><span><b>소요시간 기준 순서</b><p>카카오 도로망의 실제 주행시간으로 순서를 정합니다. 저속 골목이 낀 순서는 자연히 밀려납니다.</p></span></div>
+      <div class="step"><span class="n">2</span><span><b>도로 등급 판정</b><p>경로에 쓰인 도로명을 봅니다. <code>~대로</code>·<code>~로</code>는 큰 길, <code>~길</code>·<code>~번길</code>은 이면도로로 셉니다.</p></span></div>
+      <div class="step"><span class="n">3</span><span><b>정류장 이동 제안</b><p>이면도로에 선 정류장은 경로상 가장 가까운 큰 길 지점을 찾아 알려 줍니다. 버튼 한 번으로 옮겨 다시 계산합니다.</p></span></div>
+      <div class="step"><span class="n">4</span><span><b>골목 비율 확인</b><p>구간마다 골목 주행 비율을 계산해 지도에 주황색으로 표시합니다. 남는 골목은 눈으로 확인하고 손보면 됩니다.</p></span></div>
+    </div>
+  </section>
+
+  <section class="card faq">
+    <h2>자주 묻는 질문</h2>
+    <details open><summary>원생 주소가 어디로 전송되나요?</summary>
+      <p>주소와 좌표는 본인이 운영하는 프록시를 거쳐 <b>카카오모빌리티·카카오 로컬 API</b>로만 전달됩니다. 국내 사업자이며, 앞선 버전에서 쓰던 해외 공개 서버로는 더 이상 나가지 않습니다. 다만 아동 개인정보를 다루는 만큼 보호자 동의와 내부 관리 절차는 별도로 갖추셔야 합니다.</p></details>
+    <details><summary>REST 키가 노출되지 않나요?</summary>
+      <p>REST 키는 프록시 서버에만 두고 브라우저로 내려보내지 않습니다. 정적 페이지에 들어가는 JavaScript 키는 공개를 전제로 한 키이며, 카카오 콘솔에서 도메인을 등록해 다른 사이트에서 쓰지 못하게 막습니다.</p></details>
+    <details><summary>‘골목’은 무엇을 기준으로 판단하나요?</summary>
+      <p>도로명 접미사를 씁니다. 한국 도로명은 <code>~대로</code>, <code>~로</code>, <code>~길</code> 순으로 폭이 좁아지고 <code>~번길</code>은 대부분 이면도로입니다. 이름을 알 수 없는 도로는 주행속도가 20km/h 미만일 때만 골목으로 셉니다.</p></details>
+    <details><summary>골목을 100% 없앨 수는 없나요?</summary>
+      <p>없습니다. 간선도로가 없는 주택가는 어떤 경로로도 이면도로를 지나야 합니다. 이 도구는 골목 주행을 줄이고 남은 구간을 눈에 보이게 하는 데까지만 합니다. 실제 도로 폭과 회전 반경 판단은 기사님 몫입니다.</p></details>
+    <details><summary>호출 한도가 있나요?</summary>
+      <p>카카오모빌리티 길찾기 API는 일일 호출 한도가 있습니다. 한 번 계산할 때 지점 수만큼 행렬 호출이 발생하므로, 지점이 많으면 한도를 빠르게 씁니다. 저장된 노선을 재사용하시면 호출을 아낄 수 있습니다.</p></details>
+  </section>
+
+  <footer class="card">
+    <div class="fin">
+      <span>통학차량 동선을 정리하는 도구입니다. 계산 결과는 참고용이며, 운행 전 현장 확인이 필요합니다.<br>
+        경로 · 주소 데이터 제공: 카카오모빌리티 길찾기 API, 카카오 로컬 API</span>
+    </div>
+  </footer>
+</main>
+
+<script src="./config.js"></script>
+<script>
+/* ===================== 설정 ===================== */
+const CFG = window.APP_CONFIG || {};
+const API = String(CFG.PROXY_URL || '').replace(/\/+$/, '');
+const MAX_STOPS = 20;
+const LS = { saved:'bus.saved', hist:'bus.hist' };
+
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const esc = t => String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const say = (m, k='') => { const el = $('#status'); el.textContent = m; el.className = 'status ' + k; };
+const km = v => v < 1 ? Math.round(v * 1000) + ' m' : v.toFixed(1) + ' km';
+const mins = v => v >= 60 ? `${Math.floor(v/60)}시간 ${Math.round(v%60)}분` : `${Math.round(v)}분`;
+const pct = v => Math.round(v * 100) + '%';
+
+const S = { pts: [], order: [], legs: [], stops: [], mode: 'fixed',
+            summary: null, map: null, overlays: [], lines: [], clickMode: false };
+
+/* ===================== 프록시 호출 ===================== */
+async function post(path, body){
+  if (!API) throw new Error('config.js 의 PROXY_URL 이 비어 있습니다.');
+  let res;
+  try {
+    res = await fetch(API + path, {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+  } catch { throw new Error('프록시 서버에 연결하지 못했습니다. 서버가 켜져 있는지 확인하세요.'); }
+  const d = await res.json().catch(() => ({ error:'응답을 해석하지 못했습니다.' }));
+  if (!res.ok) throw new Error(d.error || `요청 실패 (${res.status})`);
+  return d;
+}
+
+/* ===================== 기하 · 도로 등급 ===================== */
+function haversine(a, b){
+  const R = 6371, rad = d => d * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat/2)**2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+/** 다른 어떤 지점과도 20km 넘게 떨어진 지점 — 주소를 잘못 잡았을 가능성이 높다 */
+function outliers(pts){
+  if (pts.length < 3) return [];
+  return pts.filter(p => {
+    let min = Infinity;
+    for (const q of pts) if (q !== p) min = Math.min(min, haversine(p, q));
+    return min > 20;
+  }).map(p => p.name);
+}
+
+/* ===================== 순서 최적화 (브라우저에서 계산) ===================== */
+function cost(route, M, mode){
+  let s = 0;
+  for (let i = 0; i < route.length - 1; i++) s += M[route[i]][route[i+1]];
+  if (mode === 'loop' && route.length > 1) s += M[route[route.length-1]][route[0]];
+  return s;
+}
+function greedy(start, M, pool){
+  const left = new Set(pool), route = [];
+  let cur = start;
+  if (left.has(start)){ route.push(start); left.delete(start); }
+  while (left.size){
+    let best = -1, bd = Infinity;
+    for (const i of left) if (M[cur][i] < bd){ bd = M[cur][i]; best = i; }
+    route.push(best); left.delete(best); cur = best;
+  }
+  return route;
+}
+function twoOpt(route, M, mode, lo, hi){
+  let best = cost(route, M, mode), again = true, guard = 0;
+  while (again && guard++ < 80){
+    again = false;
+    for (let i = lo; i < hi; i++){
+      for (let j = i + 1; j <= hi; j++){
+        const cand = route.slice(0, i).concat(route.slice(i, j+1).reverse(), route.slice(j+1));
+        const c = cost(cand, M, mode);
+        if (c < best - 1e-9){ route = cand; best = c; again = true; }
+      }
+    }
+  }
+  return route;
+}
+function optimize(M, mode){
+  const n = M.length, all = [...Array(n).keys()];
+  if (n <= 2) return all;
+  // 'fixed' 는 비용 계산상 편도와 같다 (출발·도착만 고정)
+  const cm = mode === 'fixed' ? 'linear' : mode;
+  const lo = mode === 'fixed' ? 1 : (mode === 'loop' ? 1 : 0);
+  const hi = mode === 'fixed' ? n - 2 : n - 1;
+
+  let best;
+  if (mode === 'fixed'){
+    best = twoOpt([0, ...greedy(0, M, all.slice(0, n-1)).slice(1), n-1], M, cm, lo, hi);
+  } else {
+    let seed = all, seedCost = Infinity;
+    for (const s of all){
+      const r = greedy(s, M, all), c = cost(r, M, cm);
+      if (c < seedCost){ seedCost = c; seed = r; }
+    }
+    best = twoOpt(seed, M, cm, lo, hi);
+  }
+  // 사용자가 이미 잡아 둔 순서도 후보로 넣는다.
+  // 탐욕 해가 지역 최적에 갇히면 입력 순서보다 나쁜 답이 나올 수 있다.
+  const asGiven = twoOpt(all.slice(), M, cm, lo, hi);
+  return cost(asGiven, M, cm) < cost(best, M, cm) ? asGiven : best;
+}
+
+/* ===================== 입력 파싱 ===================== */
+const COORD = /^\s*(-?\d{1,3}(?:\.\d+)?)\s*[,/ ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/;
+function parseLine(line){
+  const at = line.lastIndexOf('@');
+  if (at > 0){
+    const m = COORD.exec(line.slice(at + 1));
+    if (m) return { name: line.slice(0, at).trim(), lat: +m[1], lng: +m[2] };
+  }
+  const m = COORD.exec(line);
+  if (m) return { name: `${m[1]}, ${m[2]}`, lat: +m[1], lng: +m[2] };
+  return null;
+}
+
+/* ===================== 계산 ===================== */
+function currentOpts(){
+  const bus = $('#busOn').checked;
+  const avoid = [];
+  if (bus && $('#optUturn').checked)    avoid.push('uturn');
+  if (bus && $('#optMotorway').checked) avoid.push('motorway');
+  return {
+    bus, avoid,
+    suggest: bus && $('#optSuggest').checked,
+    radius:  +$('#optRadius').value,
+    priority: bus ? 'RECOMMEND' : 'DISTANCE'
+  };
+}
+async function calculate(){
+  const lines = $('#addr').value.split('\n').map(s => s.trim()).filter(Boolean);
+  if (lines.length < 2)         return say('정차 지점을 2개 이상 입력해 주세요.', 'err');
+  if (lines.length > MAX_STOPS) return say(`한 번에 ${MAX_STOPS}개까지 계산할 수 있습니다.`, 'err');
+
+  const opt = currentOpts();
+  const btn = $('#calcBtn');
+  btn.disabled = true; btn.textContent = '계산 중…';
+  try {
+    // 먼저 좌표로 직접 준 지점을 지역 기준점으로 잡는다.
+    // 기준점이 있으면 '○○동주민센터' 같은 질의가 다른 시·도로 튀는 것을 막을 수 있다.
+    const pts = new Array(lines.length);
+    const failed = [];
+    let near = lines.map(parseLine).find(Boolean) || null;
+
+    for (let i = 0; i < lines.length; i++){
+      const direct = parseLine(lines[i]);
+      if (direct){ pts[i] = direct; continue; }
+      say(`주소 확인 중 (${i + 1}/${lines.length})…`);
+      try {
+        const p = await post('/api/geocode', { q: lines[i], near });
+        pts[i] = p;
+        near = near || p;                    // 첫 성공 지점을 이후 검색의 기준으로 쓴다
+      } catch (e){
+        failed.push(`${i + 1}번째 줄 「${lines[i]}」 — ${e.message}`);
+      }
+    }
+    // 실패한 줄을 한 번에 알려준다. 한 건마다 멈추면 어디를 고쳐야 할지 알기 어렵다.
+    if (failed.length)
+      throw new Error(`주소 ${failed.length}건을 확인하지 못했습니다.\n${failed.join('\n')}`);
+
+    const far = outliers(pts);
+    if (far.length){
+      say(`주의: ${far.join(', ')} 이(가) 다른 지점들과 20km 넘게 떨어져 있습니다. 주소가 맞는지 확인하세요.`, 'err');
+      await new Promise(r => setTimeout(r, 2500));
+    }
+    S.pts  = pts;
+    S.mode = document.querySelector('input[name=mode]:checked').value;
+
+    say('도로망 거리·시간을 받는 중…');
+    const M = await post('/api/matrix', {
+      points: pts, priority: opt.bus ? 'TIME' : 'DISTANCE', avoid: opt.avoid
+    });
+    S.order = optimize(opt.bus ? M.dur : M.dist, S.mode);
+
+    await fetchRoute(opt);
+    render(opt);
+    pushHistory(lines, S.mode);
+
+    const t = totals();
+    const warn = M.approxCells ? ` (도로망으로 못 구한 구간 ${M.approxCells}칸은 직선거리로 메웠습니다)` : '';
+    say(`계산 완료 — 큰 길 주행 ${pct(1 - t.narrow)}.${warn}`, 'ok');
+    if (window.matchMedia('(max-width:820px)').matches) showPane('result');
+  } catch (e){
+    say(e.message || '계산에 실패했습니다.', 'err');
+  } finally {
+    btn.disabled = false; btn.textContent = '최적 노선 계산하기';
+  }
+}
+async function fetchRoute(opt){
+  const seq = [...S.order];
+  if (S.mode === 'loop') seq.push(S.order[0]);
+  say('실제 주행 경로를 받는 중…');
+  const r = await post('/api/route', {
+    points: seq.map(i => S.pts[i]), priority: opt.priority, avoid: opt.avoid
+  });
+  S.legs = r.legs || [];
+  S.summary = r.summary || null;
+  S.stops = opt.suggest ? analyzeStops(opt.radius) : [];
+}
+function totals(){
+  const dist = S.summary ? S.summary.distance : S.legs.reduce((a,l) => a + l.distance, 0);
+  const dur  = S.summary ? S.summary.duration : S.legs.reduce((a,l) => a + l.duration, 0);
+  const narrowKm = S.legs.reduce((a,l) => a + l.distance * l.narrowRatio, 0);
+  return { dist, dur, narrowKm, narrow: dist ? narrowKm / dist : 0 };
+}
+
+/* ---- 정류장이 어떤 도로에 서 있는지 보고, 큰 길 후보를 제안한다 ---- */
+function analyzeStops(radiusM){
+  const verts = [];
+  for (const leg of S.legs)
+    for (const sg of leg.segs)
+      for (const c of sg.coords) verts.push({ ...c, name: sg.name, cls: sg.cls });
+  if (!verts.length) return [];
+
+  return S.order.map((idx, pos) => {
+    const p = S.pts[idx];
+    let on = null, big = null;
+    for (const v of verts){
+      const d = haversine(p, v);
+      if (!on || d < on.d) on = { d, v };
+      if ((v.cls === 'big' || v.cls === 'mid') && (!big || d < big.d)) big = { d, v };
+    }
+    const onAlley = on && (on.v.cls === 'alley' || on.v.cls === 'unknown');
+    const suggest = (onAlley && big && big.d * 1000 <= radiusM && big.d > 0.015)
+      ? { lat: big.v.lat, lng: big.v.lng, road: big.v.name || '큰 길', shift: Math.round(big.d * 1000) }
+      : null;
+    return { idx, pos, road: on?.v.name || '', cls: on?.v.cls || 'unknown', onAlley, suggest };
+  });
+}
+async function applySuggestion(pos){
+  const st = S.stops.find(s => s.pos === pos);
+  if (!st?.suggest) return;
+  const p = S.pts[st.idx];
+  S.pts[st.idx] = { ...p, lat: st.suggest.lat, lng: st.suggest.lng,
+                    moved: true, origin: p.origin || { lat: p.lat, lng: p.lng },
+                    shift: (p.shift || 0) + st.suggest.shift, road: st.suggest.road };
+  const opt = currentOpts();
+  say('정류장을 옮기고 경로를 다시 계산합니다…');
+  try { await fetchRoute(opt); render(opt); say(`‘${p.name}’ 정류장을 ${st.suggest.road} 쪽으로 옮겼습니다.`, 'ok'); }
+  catch (e){ say(e.message, 'err'); }
+}
+
+/* ===================== 결과 렌더 ===================== */
+function render(opt){
+  const { pts, order, mode, legs } = S;
+  if (!order.length) return;
+  const T = totals();
+
+  $('#list').innerHTML = order.map((idx, i) => {
+    const p = pts[idx];
+    const first = i === 0, last = i === order.length - 1;
+    const role = first ? 's' : (last && mode !== 'loop' ? 'e' : '');
+    const tag  = first ? '출발' : (last && mode !== 'loop' ? '도착' : `정류장 ${i}`);
+    const leg  = legs[i];
+    const st   = S.stops.find(s => s.pos === i);
+
+    const bits = [tag];
+    if (st?.road) bits.push(esc(st.road));
+    if (leg) bits.push(`다음까지 ${km(leg.distance)} · ${mins(leg.duration)}`);
+
+    const badges = [];
+    if (p.moved) badges.push(`<span class="tag moved">${esc(p.road)} 이동 ${p.shift}m</span>`);
+    else if (st?.onAlley) badges.push('<span class="tag alley">이면도로</span>');
+    if (leg) badges.push(leg.narrowRatio > .25
+      ? `<span class="tag alley">골목 ${pct(leg.narrowRatio)}</span>`
+      : `<span class="tag big">큰 길 ${pct(1 - leg.narrowRatio)}</span>`);
+
+    const fix = st?.suggest
+      ? `<button class="fix" type="button" data-fix="${i}">${esc(st.suggest.road)}로 ${st.suggest.shift}m 이동</button>`
+      : `<button class="go" type="button" data-idx="${idx}">길찾기</button>`;
+
+    return `<div class="item" draggable="true" data-pos="${i}">
+      <span class="no ${role}">${i + 1}</span>
+      <span class="itxt"><b>${esc(p.name)} ${badges.join(' ')}</b><i>${bits.join(' · ')}</i></span>
+      ${fix}
+    </div>`;
+  }).join('');
+
+  $('#total').innerHTML =
+    `총 운행거리 ${km(T.dist)} · ${mins(T.dur)}` +
+    `<i>카카오모빌리티 도로망 기준${mode === 'loop' ? ' · 출발지 복귀 포함' : ''}` +
+    `${pts.filter(p => p.moved).length ? ` · 정류장 ${pts.filter(p=>p.moved).length}곳 이동` : ''}</i>`;
+
+  $('#gauge').hidden = false;
+  $('#gaugeFill').style.width  = pct(1 - T.narrow);
+  $('#gaugeBig').textContent   = `큰 길 ${pct(1 - T.narrow)} (${km(T.dist - T.narrowKm)})`;
+  $('#gaugeAlley').textContent = `골목 ${pct(T.narrow)} (${km(T.narrowKm)})`;
+
+  $('#pane-result').hidden = false;
+  bindItems();
+  drawMap();
+}
+function bindItems(){
+  let from = null;
+  $$('#list .item').forEach(el => {
+    el.addEventListener('dragstart', e => {
+      from = +el.dataset.pos; el.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', String(from)); } catch {}
+    });
+    el.addEventListener('dragend', () => {
+      el.classList.remove('dragging');
+      $$('#list .item').forEach(x => x.classList.remove('over'));
+    });
+    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+    el.addEventListener('dragleave', () => el.classList.remove('over'));
+    el.addEventListener('drop', async e => {
+      e.preventDefault();
+      const to = +el.dataset.pos;
+      if (from === null || from === to) return;
+      S.order.splice(to, 0, S.order.splice(from, 1)[0]);
+      from = null;
+      const opt = currentOpts();
+      say('순서를 바꿨습니다. 경로를 다시 받는 중…');
+      try { await fetchRoute(opt); render(opt); say('순서를 직접 바꿔 다시 계산했습니다.'); }
+      catch (err){ say(err.message, 'err'); }
+    });
+  });
+  $$('#list .fix').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation(); applySuggestion(+b.dataset.fix);
+  }));
+  $$('#list .go').forEach(b => b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const p = S.pts[+b.dataset.idx];
+    window.open(`https://map.kakao.com/link/to/${encodeURIComponent(p.name)},${p.lat},${p.lng}`, '_blank', 'noopener');
+  }));
+}
+
+/* ===================== 지도 (카카오맵) ===================== */
+function initMap(){
+  if (!CFG.KAKAO_JS_KEY) return;
+  const s = document.createElement('script');
+  s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${encodeURIComponent(CFG.KAKAO_JS_KEY)}&autoload=false`;
+  s.onload = () => kakao.maps.load(() => {
+    const el = $('#map');
+    el.innerHTML = ''; el.style.display = 'block';
+    S.map = new kakao.maps.Map(el, { center: new kakao.maps.LatLng(37.5665, 126.9780), level: 7 });
+    kakao.maps.event.addListener(S.map, 'click', e => {
+      if (!S.clickMode) return;
+      const lat = e.latLng.getLat(), lng = e.latLng.getLng();
+      const ta = $('#addr');
+      ta.value = (ta.value.trim() ? ta.value.replace(/\s*$/, '') + '\n' : '')
+               + `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      say('지도에서 정차 지점을 추가했습니다.', 'ok');
+    });
+    if (S.order.length) drawMap();
+  });
+  s.onerror = () => say('카카오 지도 SDK를 불러오지 못했습니다. JavaScript 키와 등록 도메인을 확인하세요.', 'err');
+  document.head.appendChild(s);
+}
+function drawMap(){
+  if (!S.map) return;
+  S.overlays.forEach(o => o.setMap(null)); S.overlays = [];
+  S.lines.forEach(l => l.setMap(null));    S.lines = [];
+  const bounds = new kakao.maps.LatLngBounds();
+
+  for (const leg of S.legs){
+    for (const sg of leg.segs){
+      if (sg.coords.length < 2) continue;
+      const path = sg.coords.map(c => {
+        const ll = new kakao.maps.LatLng(c.lat, c.lng);
+        bounds.extend(ll); return ll;
+      });
+      const line = new kakao.maps.Polyline({
+        map: S.map, path, strokeWeight: sg.narrow ? 7 : 5,
+        strokeColor: sg.narrow ? '#f08a24' : '#2f6bff',
+        strokeOpacity: .9, strokeStyle: 'solid'
+      });
+      S.lines.push(line);
+    }
+  }
+  S.order.forEach((idx, i) => {
+    const p = S.pts[idx];
+    const role = i === 0 ? 's' : (i === S.order.length - 1 && S.mode !== 'loop' ? 'e' : '');
+    const box = document.createElement('div');
+    box.className = 'pin ' + role;
+    box.textContent = String(i + 1);
+    box.title = p.name + (p.moved ? ` (${p.road} 쪽으로 ${p.shift}m 이동)` : '');
+    const ll = new kakao.maps.LatLng(p.lat, p.lng);
+    bounds.extend(ll);
+    S.overlays.push(new kakao.maps.CustomOverlay({ map: S.map, position: ll, content: box, zIndex: 5 }));
+  });
+
+  if (!bounds.isEmpty()) S.map.setBounds(bounds, 40, 40, 40, 40);
+  const T = totals();
+  $('#mapNote').textContent = `${S.pts.length}개 지점 · 큰 길 주행 ${pct(1 - T.narrow)}`;
+}
+
+/* ===================== 저장 · 기록 ===================== */
+function renderSaved(){
+  const list = lsGet(LS.saved, []);
+  $('#savedCount').textContent = `(${list.length})`;
+  $('#savedPanel').innerHTML = list.length
+    ? list.map((r, i) => `<div class="rowitem">
+        <div data-load="${i}"><b>${esc(r.title)}</b><i>${r.count}개 지점 · ${esc(r.date)}</i></div>
+        <button class="del" type="button" data-del="${i}">삭제</button></div>`).join('')
+    : '<p class="mini" style="padding:10px;text-align:center">저장된 노선이 없습니다.</p>';
+  $$('#savedPanel [data-load]').forEach(el => el.addEventListener('click', () => {
+    const r = lsGet(LS.saved, [])[+el.dataset.load];
+    $('#addr').value = r.text;
+    document.querySelector(`input[name=mode][value="${r.mode}"]`).checked = true;
+    syncModes(); say(`‘${r.title}’ 노선을 불러왔습니다.`, 'ok');
+  }));
+  $$('#savedPanel [data-del]').forEach(el => el.addEventListener('click', () => {
+    const list = lsGet(LS.saved, []);
+    list.splice(+el.dataset.del, 1); lsSet(LS.saved, list); renderSaved();
+  }));
+}
+function saveRoute(){
+  const text = $('#addr').value.trim();
+  if (!text) return say('저장할 지점이 없습니다.', 'err');
+  const first = text.split('\n')[0].replace(/@.*$/, '').trim();
+  const title = (prompt('저장할 노선 이름', first.slice(0, 20) || '오전 노선') || '').trim();
+  if (!title) return;
+  const list = lsGet(LS.saved, []);
+  list.unshift({ title, text, mode: document.querySelector('input[name=mode]:checked').value,
+    count: text.split('\n').filter(s => s.trim()).length,
+    date: new Date().toLocaleDateString('ko-KR') });
+  lsSet(LS.saved, list.slice(0, 30));
+  renderSaved(); $('#savedPanel').hidden = false;
+  say(`‘${title}’ 으로 저장했습니다.`, 'ok');
+}
+function pushHistory(lines, mode){
+  const list = lsGet(LS.hist, []);
+  list.unshift({ text: lines.join('\n'), mode, count: lines.length,
+    at: new Date().toLocaleString('ko-KR', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) });
+  lsSet(LS.hist, list.slice(0, 10));
+  renderHistory();
+}
+function renderHistory(){
+  const list = lsGet(LS.hist, []);
+  $('#hist').innerHTML = list.length
+    ? list.map((h, i) => `<div class="rowitem"><div data-h="${i}">
+        <b>${esc(h.text.split('\n')[0].replace(/@.*$/, '').trim())} 외 ${Math.max(h.count - 1, 0)}곳</b>
+        <i>${esc(h.at)} · ${h.mode === 'loop' ? '순환' : h.mode === 'fixed' ? '출발·도착 고정' : '편도'}</i></div></div>`).join('')
+    : '기록이 없습니다.';
+  $$('#hist [data-h]').forEach(el => el.addEventListener('click', () => {
+    const h = lsGet(LS.hist, [])[+el.dataset.h];
+    $('#addr').value = h.text;
+    document.querySelector(`input[name=mode][value="${h.mode}"]`).checked = true;
+    syncModes();
+    if (window.matchMedia('(max-width:820px)').matches) showPane('input');
+    say('기록을 불러왔습니다. 다시 계산해 보세요.');
+  }));
+}
+
+/* ===================== UI ===================== */
+function syncModes(){
+  $$('#modes .mode').forEach(m => m.classList.toggle('on', m.querySelector('input').checked));
+}
+function showPane(name){
+  $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.pane === name));
+  document.body.dataset.tab = name;
+  if (name === 'map' && S.map) setTimeout(() => { S.map.relayout(); drawMap(); }, 80);
+}
+$('#modes').addEventListener('change', syncModes);
+$('#busOn').addEventListener('change', e => $('#busOpt').classList.toggle('off', !e.target.checked));
+$('#optRadius').addEventListener('input', e => $('#radiusVal').textContent = e.target.value + ' m');
+$('#calcBtn').addEventListener('click', calculate);
+$('#saveBtn').addEventListener('click', saveRoute);
+$('#listBtn').addEventListener('click', () => { $('#savedPanel').hidden = !$('#savedPanel').hidden; });
+$('#clearHist').addEventListener('click', () => { lsSet(LS.hist, []); renderHistory(); });
+$$('.tab').forEach(t => t.addEventListener('click', () => showPane(t.dataset.pane)));
+
+$('#sampleBtn').addEventListener('click', () => {
+  // 모두 카카오 API 로 실제 조회되는 것을 확인한 지점들
+  $('#addr').value = [
+    '은평구청',
+    '역촌역',
+    '구산역',
+    '연신내역',
+    '녹번역',
+    '은평문화예술회관'
+  ].join('\n');
+  document.querySelector('input[name=mode][value=fixed]').checked = true;
+  syncModes();
+  say('예제 노선을 넣었습니다. 첫 줄이 차고지, 마지막 줄이 유치원입니다.');
+});
+$('#geoBtn').addEventListener('click', () => {
+  if (!navigator.geolocation) return say('이 브라우저는 위치 기능을 지원하지 않습니다.', 'err');
+  say('현재 위치를 확인하는 중…');
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    const ta = $('#addr');
+    ta.value = (ta.value.trim() ? ta.value.replace(/\s*$/, '') + '\n' : '')
+             + `현재 위치 @ ${lat.toFixed(6)},${lng.toFixed(6)}`;
+    say('현재 위치를 추가했습니다.', 'ok');
+  }, () => say('위치 권한이 거부되었습니다.', 'err'), { enableHighAccuracy:true, timeout:8000 });
+});
+$('#clickBtn').addEventListener('click', () => {
+  if (!S.map) return say('지도를 먼저 설정해 주세요 (config.js 의 KAKAO_JS_KEY).', 'err');
+  S.clickMode = !S.clickMode;
+  $('#clickBtn').classList.toggle('on', S.clickMode);
+  $('#mapNote').textContent = S.clickMode ? '지도를 클릭해 정차 지점을 추가하세요' : '계산하면 실제 도로 경로가 그려집니다';
+});
+$('#kakaoBtn').addEventListener('click', () => {
+  if (S.order.length < 2) return;
+  const a = S.pts[S.order[0]], b = S.pts[S.order[1]];
+  const mobile = /android|iphone|ipad/i.test(navigator.userAgent);
+  window.open(mobile
+    ? `kakaomap://route?sp=${a.lat},${a.lng}&ep=${b.lat},${b.lng}&by=CAR`
+    : `https://map.kakao.com/link/to/${encodeURIComponent(b.name)},${b.lat},${b.lng}`,
+    mobile ? '_self' : '_blank', 'noopener');
+});
+$('#copyBtn').addEventListener('click', async () => {
+  if (!S.order.length) return;
+  const T = totals();
+  const body = S.order.map((idx, i) => {
+    const p = S.pts[idx], leg = S.legs[i], st = S.stops.find(s => s.pos === i);
+    return `${i + 1}. ${p.name}${p.moved ? ` [${p.road} 앞, ${p.shift}m 이동]` : ''}${st?.road ? ` (${st.road})` : ''}`
+      + (leg ? `\n    → ${km(leg.distance)} · ${mins(leg.duration)}${leg.narrowRatio > .25 ? ` · 골목 ${pct(leg.narrowRatio)}` : ''}` : '');
+  }).join('\n');
+  const text = `[통학버스 노선]\n${body}\n\n총 ${km(T.dist)} · ${mins(T.dur)} · 큰 길 주행 ${pct(1 - T.narrow)}`;
+  try { await navigator.clipboard.writeText(text); say('노선표를 복사했습니다.', 'ok'); }
+  catch { say('복사에 실패했습니다. 직접 선택해 복사해 주세요.', 'err'); }
+});
+
+/* ===================== 시작 ===================== */
+async function checkServer(){
+  const el = $('#conn');
+  const problems = [];
+  if (!API) problems.push('config.js 의 PROXY_URL 이 비어 있습니다.');
+  if (!CFG.KAKAO_JS_KEY) problems.push('config.js 의 KAKAO_JS_KEY 가 비어 있어 지도가 표시되지 않습니다.');
+  if (API){
+    try {
+      await post('/api/health', {});
+      el.textContent = '프록시 연결됨'; el.className = 'conn ok';
+    } catch (e){
+      problems.push(`프록시에 연결하지 못했습니다 — ${e.message}`);
+      el.textContent = '프록시 연결 안 됨'; el.className = 'conn bad';
+    }
+  } else { el.textContent = '설정 필요'; el.className = 'conn bad'; }
+  if (problems.length){
+    $('#setup').hidden = false;
+    $('#setupMsg').textContent = problems.join(' ');
+  }
+}
+syncModes();
+renderSaved();
+renderHistory();
+initMap();
+checkServer();
+</script>
+</body>
+</html>

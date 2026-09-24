@@ -1,0 +1,18 @@
+# 키가 든 파일은 절대 커밋하지 않습니다
+.env
+*.env
+proxy/.env
+!proxy/.env.example
+
+# 실제 원생 주소가 담길 수 있는 파일
+routes/
+*.routes.json
+
+node_modules/
+.wrangler/
+.DS_Store
+Thumbs.db
+
+# 토큰 임시 파일 (방어용)
+*token*.txt
+.git-token

@@ -1,0 +1,11 @@
+name = "bus-route-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# 허용할 출처를 본인 것으로 바꾸세요. 여러 개면 쉼표로 구분합니다.
+# GitHub Pages 주소 형식: https://<깃허브아이디>.github.io
+[vars]
+ALLOW_ORIGIN = "http://127.0.0.1:8777,http://localhost:8777"
+
+# REST 키는 여기에 적지 말고 secret 으로 넣으세요:
+#   npx wrangler secret put KAKAO_REST_KEY
